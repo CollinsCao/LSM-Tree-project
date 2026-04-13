@@ -9,13 +9,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
+import java.nio.file.Files;
 import java.io.IOException;
 import java.nio.file.Path;
 
 class SSTableTest {
 
   private SSTable sstable;
+  private static final String LARGE_VAL = "large_value_".repeat(50);
 
   /**
    * Automatic temporary directory management via JUnit 5.
@@ -34,7 +35,7 @@ class SSTableTest {
     memtable.put("elderberry", "purple_fruit");
 
     // Populate large value for cross-block read/write verification
-    memtable.put("fig", "large_value_".repeat(50));
+    memtable.put("fig", LARGE_VAL);
 
     // Create SSTable with tempDir
     sstable = SSTable.createSSTableFromMemtable(memtable, tempDir);
@@ -61,17 +62,41 @@ class SSTableTest {
 
   @Test
   void testGetLargeValue() {
-    String expected = new StringBuilder().repeat("large_value_", 50).toString();
-
     String actual = sstable.get("fig");
     assertNotNull(actual);
-    assertEquals(expected, actual, "Should correctly retrieve large string values");
+    assertEquals(LARGE_VAL, actual, "Should correctly retrieve large string values");
   }
 
   @Test
   void testFileExists() {
-    File f = new File(sstable.getFilePath());
-    assertTrue(f.exists(), "SSTable file should be created on disk");
-    assertTrue(f.length() > 0, "SSTable file should not be empty");
+    Path path = sstable.getFilePath();
+    assertTrue(Files.exists(path), "SSTable file should be created on disk");
+    try {
+      assertTrue(Files.size(path) > 0, "SSTable file should not be empty");
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to get file's size", e);
+    }
+  }
+
+  @Test
+  void testInitRecovery() throws IOException {
+    // Arrange: Verify existing SSTable file from setUp
+    Path path = sstable.getFilePath();
+    assertTrue(Files.exists(path), "SSTable file should exist before recovery");
+
+    // Act: Simulate system restart by dropping reference and reloading from disk
+    sstable = null;
+    SSTable recoveredSSTable = new SSTable(path);
+
+    // Assert: Verify metadata and data integrity after reconstruction
+    assertNotNull(recoveredSSTable.getFilePath());
+
+    // Verify point lookups for existing keys
+    assertEquals("red_fruit", recoveredSSTable.get("apple"), "Recovery failed for key: apple");
+    assertEquals("yellow_fruit", recoveredSSTable.get("banana"), "Recovery failed for key: banana");
+    assertEquals(LARGE_VAL, recoveredSSTable.get("fig"), "Recovery failed for key: fig");
+
+    // Verify non-existent keys
+    assertNull(recoveredSSTable.get("zebra"), "Lookup should return null for non-existent key after recovery");
   }
 }

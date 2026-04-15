@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Map;
@@ -90,18 +91,24 @@ public class SSTable {
   }
 
   public static SSTable createSSTableFromMemtable(Memtable memtable, Path dirtory) throws IOException {
-    File folder = dirtory.toFile();
-    if (!folder.exists()) {
-      folder.mkdirs();
-    }
     Path filePath = dirtory.resolve("sstable_" + System.nanoTime() + ".sst");
-    BloomFilter<String> bloomFilter = BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8), Constants.EXPECTED_INSERTIONS, Constants.FALSE_POSITIVE_PROBABILITY);
+    return createSSTableFromIterator(memtable.iterator(), filePath);
+  }
+
+  public static SSTable createSSTableFromIterator(Iterator<Entry<String, String>> iterator, Path filePath) throws IOException {
+    Path folder = filePath.getParent();
+    if (folder != null) {
+      Files.createDirectories(folder);
+    }
+
+    BloomFilter<String> bloomFilter = BloomFilter.create(Funnels.stringFunnel(StandardCharsets.UTF_8),
+        Constants.EXPECTED_INSERTIONS, Constants.FALSE_POSITIVE_PROBABILITY);
+
     TreeMap<String, BlockInfo> blocks = new TreeMap<>();//<firstKey, blockInfor>
     String minKey = null;
     String maxKey = null;
 
     try (RandomAccessFile raf = new RandomAccessFile(String.valueOf(filePath), "rw"))  {
-      Iterator<Entry<String, String>> iterator = memtable.iterator();
       long lenOfBlock = 0L;
       long startOfBlock = 0L;
       String firstKeyInBlock = null;
@@ -161,7 +168,7 @@ public class SSTable {
     if (!bloomFilter.mightContain(key)) {
       return null;
     }
-    
+
     Map.Entry<String, BlockInfo> entry = blocks.floorEntry(key);
     if (entry == null) {
       return null;

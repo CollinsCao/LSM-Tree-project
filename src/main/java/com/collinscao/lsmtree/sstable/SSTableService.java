@@ -12,8 +12,8 @@ public class SSTableService {
 
   public String get(String key) {
     List<SSTable> levelList = manifest.getSSTable(0);
-    for (SSTable level : levelList) {
-      String value = level.get(key);
+    for (SSTable sstable : levelList) {
+      String value = sstable.get(key);
       if (value != null) {
         return value;
       }

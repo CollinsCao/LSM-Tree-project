@@ -1,7 +1,7 @@
 package com.collinscao.lsmtree.sstable;
 
 
-import com.collinscao.memtable.Memtable;
+import com.collinscao.lsmtree.memtable.Memtable;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.util.Constants;
@@ -84,14 +84,18 @@ public class SSTable {
     }
   }
 
-
-  public static SSTable createSSTableFromMemtable(Memtable memtable) throws IOException{
-    return createSSTableFromMemtable(memtable, Path.of("./data"));
+  public static Path generateSSTablePath(Path rootPath) {
+    String fileName = Constants.SSTABLE_PREFIX + System.nanoTime() + Constants.SSTABLE_FILE_EXTENSION;
+    return rootPath.resolve(fileName);
   }
 
-  public static SSTable createSSTableFromMemtable(Memtable memtable, Path dirtory) throws IOException {
-    Path filePath = dirtory.resolve("sstable_" + System.nanoTime() + ".sst");
-    return createSSTableFromIterator(memtable.iterator(), filePath);
+
+  public static SSTable createSSTableFromMemtable(Memtable memtable) throws IOException{
+    return createSSTableFromMemtable(memtable, Path.of(Constants.DEFAULT_DATA_DIR).toAbsolutePath());
+  }
+
+  public static SSTable createSSTableFromMemtable(Memtable memtable, Path rootPath) throws IOException {
+    return createSSTableFromIterator(memtable.iterator(), generateSSTablePath(rootPath));
   }
 
   public static SSTable createSSTableFromIterator(Iterator<Entry<String, String>> iterator, Path filePath) throws IOException {
@@ -209,5 +213,19 @@ public class SSTable {
 
   public Path getFilePath() {
     return filePath;
+  }
+
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    SSTable sstable = (SSTable) o;
+    return java.util.Objects.equals(filePath, sstable.filePath);
+  }
+
+  @Override
+  public int hashCode() {
+    return java.util.Objects.hash(filePath);
   }
 }

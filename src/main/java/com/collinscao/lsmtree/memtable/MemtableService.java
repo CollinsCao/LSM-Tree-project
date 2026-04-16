@@ -1,4 +1,4 @@
-package com.collinscao.memtable;
+package com.collinscao.lsmtree.memtable;
 
 import com.collinscao.lsmtree.manifest.Manifest;
 import com.collinscao.lsmtree.sstable.SSTableService;

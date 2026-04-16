@@ -1,8 +1,8 @@
 package com.collinscao.lsmtree.core;
 
 import com.collinscao.lsmtree.manifest.Manifest;
-import com.collinscao.lsmtree.memtable.MemtableService;
 import com.collinscao.lsmtree.sstable.SSTableService;
+import com.collinscao.lsmtree.memtable.MemtableService;
 import com.util.Constants;
 import java.io.IOException;
 
@@ -40,5 +40,6 @@ public class DB implements AutoCloseable {
     @Override
     public void close() throws IOException {
       memtableService.close();
+      sstableService.stop();
     }
   }

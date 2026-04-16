@@ -12,6 +12,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+
 /**
  * Integration tests for {@link SSTableService}, focusing on multi-level
  * lookup logic and version precedence within the LSM tree.
@@ -29,7 +30,7 @@ class SSTableServiceTest {
     // 1. Initialize the Manifest to track table metadata
     manifest = new Manifest(tempDir.toString());
 
-    // 2. Prepare mock data: Simulate the flushing of two Memtables into SSTables
+    // 2. Prepare mock data: Simulate flushing two Memtables into SSTables
 
     // Older SSTable (sstOld): Contains a key "a" that will eventually be shadowed
     Memtable memOld = new Memtable();
@@ -38,8 +39,9 @@ class SSTableServiceTest {
     SSTable sstOld = SSTable.createSSTableFromMemtable(memOld, tempDir);
     manifest.applyFlush(0, sstOld);
 
-    // Newer SSTable (sstNew): Flushed later.
-    // In Level 0, newer files are prepended to ensure higher priority during lookups.
+    // Newer SSTable (sstNew): Appended later to Level 0.
+    // In Level 0, newer files are added to the end of the list;
+    // lookup must iterate in reverse order (from tail to head) for correct versioning.
     Memtable memNew = new Memtable();
     memNew.put("a", "new_val"); // Overwrites/shadows older value
     memNew.put("b", "val_b");   // Unique key in newer tier
@@ -52,35 +54,37 @@ class SSTableServiceTest {
 
   @AfterEach
   void tearDown() {
-    // Resources managed by @TempDir are automatically cleaned up
+    // Shut down background thread pool to prevent thread leaks across test cases
+    if (ssTableService != null) {
+      ssTableService.stop();
+    }
   }
 
   @Test
   void testGetOverwrite() {
-    // Verify shadowing logic in L0: The most recent version must be returned.
-    // Since sstNew is at the head of the list, it should be hit first.
+    // Verify L0 shadowing: The most recent version (from sstNew) must take precedence
     String val = ssTableService.get("a");
     assertEquals("new_val", val, "Should retrieve the most recent value (shadowing check)");
   }
 
   @Test
   void testGetFallThrough() {
-    // Verify fall-through lookup: If a key is missing in newer SSTables,
-    // the search should continue into older files.
+    // Verify fall-through: If a key is missing in newer SSTables,
+    // the search should successfully continue into older files.
     String val = ssTableService.get("c");
     assertEquals("val_c", val, "Should fall through to the older SSTable to find the value");
   }
 
   @Test
   void testGetNewKey() {
-    // Verify lookup for a key existing only in the most recent SSTable.
+    // Verify lookup for a key existing only in the most recent SSTable
     String val = ssTableService.get("b");
     assertEquals("val_b", val, "Should retrieve value from the most recent SSTable");
   }
 
   @Test
   void testGetNonExistent() {
-    // Verify behavior when a key is absent across all SSTable tiers.
+    // Verify behavior when a key is absent across all SSTable tiers
     String val = ssTableService.get("z");
     assertNull(val, "Lookup for a non-existent key should return null");
   }

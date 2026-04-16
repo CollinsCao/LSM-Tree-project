@@ -84,15 +84,15 @@ public class SSTable {
     }
   }
 
+
   public static Path generateSSTablePath(Path rootPath) {
     String fileName = Constants.SSTABLE_PREFIX + System.nanoTime() + Constants.SSTABLE_FILE_EXTENSION;
     return rootPath.resolve(fileName);
   }
 
-
-  public static SSTable createSSTableFromMemtable(Memtable memtable) throws IOException{
-    return createSSTableFromMemtable(memtable, Path.of(Constants.DEFAULT_DATA_DIR).toAbsolutePath());
-  }
+//  public static SSTable createSSTableFromMemtable(Memtable memtable) throws IOException{
+//    return createSSTableFromMemtable(memtable, Path.of("./data"));
+//  }
 
   public static SSTable createSSTableFromMemtable(Memtable memtable, Path rootPath) throws IOException {
     return createSSTableFromIterator(memtable.iterator(), generateSSTablePath(rootPath));
@@ -214,7 +214,6 @@ public class SSTable {
   public Path getFilePath() {
     return filePath;
   }
-
 
   @Override
   public boolean equals(Object o) {

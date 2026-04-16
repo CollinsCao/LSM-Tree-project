@@ -3,7 +3,7 @@ package com.collinscao.lsmtree.sstable;
 import static org.junit.jupiter.api.Assertions.*;
 
 
-import com.collinscao.memtable.Memtable;
+import com.collinscao.lsmtree.memtable.Memtable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,6 @@
 package com.util;
 
-import com.collinscao.memtable.Memtable;
+import com.collinscao.lsmtree.memtable.Memtable;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;

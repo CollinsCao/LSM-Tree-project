@@ -1,7 +1,7 @@
 package com.collinscao.lsmtree.sstable;
 
 
-import com.collinscao.memtable.Memtable;
+import com.collinscao.lsmtree.memtable.Memtable;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.util.Constants;

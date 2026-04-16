@@ -15,21 +15,21 @@ import java.util.Map;
 import com.util.Constants;
 
 public class Manifest {
-  private final String dataDir;
+  private final Path rootPath;
   private final Map<Integer, List<SSTable>> levelMap;
 
   public Manifest(String dataDir) throws IOException {
-    this.dataDir = dataDir;
-    this.levelMap = new HashMap<Integer, List<SSTable>>();
-
-    Path path = Path.of(dataDir);
-    if (!Files.exists(path)) Files.createDirectories(path);
+    this.rootPath = Path.of(dataDir).toAbsolutePath();
+    this.levelMap = new HashMap<>();
+    if (!Files.exists(rootPath)) Files.createDirectories(rootPath);
 
     recover();
   }
 
+
+
   private void recover() throws IOException {
-    Path currentFilePath = Path.of(dataDir, Constants.CURRENT_FILENAME);
+    Path currentFilePath = rootPath.resolve(Constants.CURRENT_FILENAME);
 
     // New database.
     if (!Files.exists(currentFilePath)) {
@@ -39,7 +39,7 @@ public class Manifest {
     // 1. Read filename referenced by CURRENT
     // trim() to remove potential newlines from readString
     String manifestFileName = Files.readString(currentFilePath).trim();
-    Path manifestPath = Path.of(dataDir, manifestFileName);
+    Path manifestPath = rootPath.resolve(manifestFileName);
     if (!Files.exists(manifestPath)) {
       throw new IOException("Manifest file pointed by CURRENT does not exist: " + manifestFileName);
     }
@@ -53,18 +53,17 @@ public class Manifest {
         List<String> levelData = entry.getValue();
         List<SSTable> levelSstables = new ArrayList<>();
         for (String partOfPath : levelData) {
-          levelSstables.add(new SSTable(Path.of(dataDir, partOfPath)));
+          levelSstables.add(new SSTable(rootPath.resolve(partOfPath)));
         }
         this.levelMap.put(level, levelSstables);
       }
     } catch (ClassNotFoundException e) {
       throw new IOException("Failed to deserialize manifest", e);
     }
+
+
   }
 
-  private String generateNextMenifestName() {
-    return Constants.MANIFEST_FILENAME + "-" + System.nanoTime();
-  }
 
   private synchronized void persist() throws IOException {
     Map<Integer, List<String>> diskData = new HashMap<>();
@@ -79,22 +78,44 @@ public class Manifest {
       diskData.put(level, levelData);
     }
 
-    String newManifestFileName = generateNextMenifestName();
-    Path newManifestPath = Path.of(dataDir, newManifestFileName);
+    Path newManifestPath = generateMenifestPath();
+
+
+
+
 
     try (OutputStream os = Files.newOutputStream(newManifestPath);
         ObjectOutputStream oos = new ObjectOutputStream(os)) {
       oos.writeObject(diskData);
     }
 
-    Path pathOfCurrentManifestFile = Path.of(dataDir, Constants.CURRENT_FILENAME);
-    Files.writeString(pathOfCurrentManifestFile, newManifestFileName);
+    Path pathOfCurrentManifestFile = rootPath.resolve(Constants.CURRENT_FILENAME);
+    Files.writeString(pathOfCurrentManifestFile, newManifestPath.getFileName().toString());
   }
 
-  public void addSSTable(int level, SSTable sstable) throws IOException {
-    levelMap.putIfAbsent(level, new ArrayList<>());
-    levelMap.get(level).add(0, sstable);
+  public synchronized void applyFlush(int level, SSTable sstable) throws IOException {
+    innerAdd(level, sstable);
     persist();
+  }
+
+  public synchronized void applyCompact(int sourceLevel, List<SSTable> oldTables,
+      int targetLevel, SSTable newTable) throws IOException {
+    innerRemove(sourceLevel, oldTables);
+    innerAdd(targetLevel, newTable);
+    persist();
+  }
+
+  private void innerAdd(int level, SSTable sstable) throws IOException {
+    levelMap.putIfAbsent(level, new ArrayList<>());
+    levelMap.get(level).add(sstable);
+  }
+
+  private void innerRemove(int level, List<SSTable> sstables) throws IOException {
+    List<SSTable> levelTables = levelMap.get(level);
+    if (levelTables.isEmpty() || sstables.isEmpty()) {
+      return;
+    }
+    levelTables.removeAll(sstables);
   }
 
   public List<SSTable> getSSTable(int level) {
@@ -104,4 +125,14 @@ public class Manifest {
     }
     return new ArrayList<>(levelList);
   }
+
+  private Path generateMenifestPath() {
+    String fileName = Constants.MANIFEST_PREFIX + System.nanoTime();
+    return rootPath.resolve(fileName);
+  }
+
+  public Path getRootPath() {
+    return rootPath;
+  }
 }
+

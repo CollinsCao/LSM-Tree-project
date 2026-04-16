@@ -1,4 +1,4 @@
-package com.collinscao.memtable;
+package com.collinscao.lsmtree.memtable;
 
 import java.util.Iterator;
 import java.util.Map.Entry;

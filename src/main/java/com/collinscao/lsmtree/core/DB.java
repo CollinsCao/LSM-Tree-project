@@ -1,6 +1,6 @@
 package com.collinscao.lsmtree.core;
 
-import com.collinscao.memtable.Memtable;
+import com.collinscao.lsmtree.memtable.Memtable;
 import com.util.Constants;
 
 public class DB {

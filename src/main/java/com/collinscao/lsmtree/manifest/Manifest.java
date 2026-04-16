@@ -12,11 +12,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import com.util.Constants;
 
 public class Manifest {
   private final Path rootPath;
   private final Map<Integer, List<SSTable>> levelMap;
+  private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
 
   public Manifest(String dataDir) throws IOException {
     this.rootPath = Path.of(dataDir).toAbsolutePath();
@@ -25,8 +29,6 @@ public class Manifest {
 
     recover();
   }
-
-
 
   private void recover() throws IOException {
     Path currentFilePath = rootPath.resolve(Constants.CURRENT_FILENAME);
@@ -46,12 +48,11 @@ public class Manifest {
 
     try (InputStream is = Files.newInputStream(manifestPath);
         ObjectInputStream ois = new ObjectInputStream(is)) {
-      @SuppressWarnings("unchecked")
       Map<Integer, List<String>> diskData = (Map<Integer, List<String>>)ois.readObject();
       for (Map.Entry<Integer, List<String>> entry : diskData.entrySet()) {
         int level = entry.getKey();
         List<String> levelData = entry.getValue();
-        List<SSTable> levelSstables = new ArrayList<>();
+        List<SSTable> levelSstables = new CopyOnWriteArrayList<>();
         for (String partOfPath : levelData) {
           levelSstables.add(new SSTable(rootPath.resolve(partOfPath)));
         }
@@ -60,29 +61,24 @@ public class Manifest {
     } catch (ClassNotFoundException e) {
       throw new IOException("Failed to deserialize manifest", e);
     }
-
-
   }
 
-
-  private synchronized void persist() throws IOException {
+  private Map<Integer, List<String>> creatDiskDataSnapshot(){
     Map<Integer, List<String>> diskData = new HashMap<>();
     for (Map.Entry<Integer, List<SSTable>> entry : this.levelMap.entrySet()) {
       int level = entry.getKey();
       List<SSTable> levelSSTs = entry.getValue();
-
       List<String> levelData = new ArrayList<>();
       for (SSTable sst : levelSSTs) {
         levelData.add(String.valueOf(sst.getFilePath().getFileName()));
       }
       diskData.put(level, levelData);
     }
+    return diskData;
+  }
 
+  private void persist(Map<Integer, List<String>> diskData) throws IOException {
     Path newManifestPath = generateMenifestPath();
-
-
-
-
 
     try (OutputStream os = Files.newOutputStream(newManifestPath);
         ObjectOutputStream oos = new ObjectOutputStream(os)) {
@@ -93,37 +89,69 @@ public class Manifest {
     Files.writeString(pathOfCurrentManifestFile, newManifestPath.getFileName().toString());
   }
 
-  public synchronized void applyFlush(int level, SSTable sstable) throws IOException {
-    innerAdd(level, sstable);
-    persist();
+  public Map<Integer, List<SSTable>> getLevelSnapshot() {
+    rwLock.readLock().lock();
+    try {
+      Map<Integer, List<SSTable>> snapShot = new HashMap<>();
+      for (Map.Entry<Integer, List<SSTable>> entry : this.levelMap.entrySet()) {
+        snapShot.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+      }
+      return snapShot;
+    } finally {
+      rwLock.readLock().unlock();
+    }
   }
 
-  public synchronized void applyCompact(int sourceLevel, List<SSTable> oldTables,
+  public void applyFlush(int level, SSTable sstable) throws IOException {
+    Map<Integer, List<String>> diskDataSnapshot;
+    rwLock.writeLock().lock();
+    try {
+      innerAdd(level, sstable);
+      diskDataSnapshot = creatDiskDataSnapshot();
+    } finally {
+      rwLock.writeLock().unlock();
+    }
+    persist(diskDataSnapshot);
+  }
+
+  public void applyCompact(int sourceLevel, List<SSTable> oldTables,
       int targetLevel, SSTable newTable) throws IOException {
-    innerRemove(sourceLevel, oldTables);
-    innerAdd(targetLevel, newTable);
-    persist();
+    Map<Integer, List<String>> diskDataSnapshot;
+    rwLock.writeLock().lock();
+    try {
+      innerRemove(sourceLevel, oldTables);
+      innerAdd(targetLevel, newTable);
+      diskDataSnapshot = creatDiskDataSnapshot();
+    } finally {
+      rwLock.writeLock().unlock();
+    }
+    persist(diskDataSnapshot);
   }
 
-  private void innerAdd(int level, SSTable sstable) throws IOException {
-    levelMap.putIfAbsent(level, new ArrayList<>());
+  private void innerAdd(int level, SSTable sstable) {
+    levelMap.putIfAbsent(level, new CopyOnWriteArrayList<>());
     levelMap.get(level).add(sstable);
   }
 
   private void innerRemove(int level, List<SSTable> sstables) throws IOException {
     List<SSTable> levelTables = levelMap.get(level);
-    if (levelTables.isEmpty() || sstables.isEmpty()) {
+    if (levelTables == null || sstables == null || sstables.isEmpty()) {
       return;
     }
     levelTables.removeAll(sstables);
   }
 
   public List<SSTable> getSSTable(int level) {
-    List<SSTable> levelList = levelMap.get(level);
-    if (levelList == null) {
-      return new ArrayList<>();
+    rwLock.readLock().lock();
+    try {
+      List<SSTable> levelList = levelMap.get(level);
+      if (levelList == null) {
+        return new ArrayList<>();
+      }
+      return new ArrayList<>(levelList);
+    } finally {
+      rwLock.readLock().unlock();
     }
-    return new ArrayList<>(levelList);
   }
 
   private Path generateMenifestPath() {
@@ -135,4 +163,3 @@ public class Manifest {
     return rootPath;
   }
 }
-

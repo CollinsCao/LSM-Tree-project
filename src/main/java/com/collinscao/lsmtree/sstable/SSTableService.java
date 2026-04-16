@@ -1,32 +1,65 @@
 package com.collinscao.lsmtree.sstable;
 
 import com.collinscao.lsmtree.manifest.Manifest;
-import com.collinscao.lsmtree.memtable.Memtable;
+import com.collinscao.lsmtree.memtable.MemtableService;
 import com.util.Constants;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class SSTableService {
   private static final int L0_THRESHOLD = 4;
   private static final int L1_THRESHOLD = 10;
   private final Manifest manifest;
   private final Compactor compactor;
+  private final ExecutorService flushExecutor = Executors.newSingleThreadExecutor(r -> {
+    Thread t = new Thread(r, "LSM-Flush-Worker");
+    t.setDaemon(true);
+    return t;
+  });
+  private final ExecutorService compactExecutor = Executors.newSingleThreadExecutor(r -> {
+    Thread t = new Thread(r, "LSM-Compact-Worker");
+    t.setDaemon(true);
+    return t;
+  });
 
   public SSTableService(Manifest manifest) {
     this.manifest = manifest;
     this.compactor = new Compactor();
   }
 
-  public void flush(Memtable memTable) throws IOException {
-    if (memTable.getSize() == 0) {return;}
-    SSTable sstable = SSTable.createSSTableFromMemtable(memTable, manifest.getRootPath());
-    this.manifest.applyFlush(0, sstable);
-    checkAndCompactLevel(0);
+  public void submitFlushTask(MemtableService.ImmutableHolder holder, Runnable onComplete) {
+    flushExecutor.submit(() -> {
+      try {
+        SSTable sstable = SSTable.createSSTableFromMemtable(holder.getMemtable(), manifest.getRootPath());
+        manifest.applyFlush(0, sstable);
+        if (holder.getWal() != null) {
+          holder.getWal().delete();
+        }
+        onComplete.run();
+        submitCompactionTask();
+      } catch (Exception e) {
+        System.err.println("Critical: Background flush failed!");
+        e.printStackTrace();
+      }
+    });
   }
 
+  private void submitCompactionTask() {
+    compactExecutor.submit(() -> {
+      try {
+        checkAndCompactLevel(0);
+      } catch (IOException e) {
+        System.err.println("Critical: Background compaction failed!");
+        e.printStackTrace();
+      }
+    });
+  }
 
   private void checkAndCompactLevel(int level) throws IOException {
     List<SSTable> tables = manifest.getSSTable(level);
@@ -39,7 +72,17 @@ public class SSTableService {
     SSTable newSSTable = compactor.compact(tablesToCompact, newFilePath);
     manifest.applyCompact(level, tablesToCompact, nextLevel, newSSTable);
     for (SSTable table : tablesToCompact) {
-      Files.deleteIfExists(table.getFilePath());
+      Path pathToDelete = table.getFilePath();
+      Thread cleanupThread = new Thread(() -> {
+        try {
+          Thread.sleep(5000);
+          Files.deleteIfExists(pathToDelete);
+        } catch (Exception e) {
+          System.err.println("Warning: Delayed deletion failed for " + pathToDelete);
+        }
+      });
+      cleanupThread.setDaemon(true);
+      cleanupThread.start();
     }
     checkAndCompactLevel(nextLevel);
   }
@@ -53,8 +96,6 @@ public class SSTableService {
     return false;
   }
 
-
-
   public String get(String key) {
     for (int i = 0; i < Constants.MAX_LEVEL; i++) {
       List<SSTable> levelList = manifest.getSSTable(i);
@@ -65,12 +106,31 @@ public class SSTableService {
             return handleTombstone(val);
           }
         }
+      } else {
+        for (SSTable table : levelList) {
+          String val = table.get(key);
+          if (val != null) {
+            return handleTombstone(val);
+          }
+        }
       }
     }
     return null;
   }
 
-    private String handleTombstone(String val) {
-      return val.equals(Constants.TOMBSTONE) ? null : val;
+  private String handleTombstone(String val) {
+    return val.equals(Constants.TOMBSTONE) ? null : val;
+  }
+
+  public void stop() {
+    flushExecutor.shutdown();
+    compactExecutor.shutdown();
+    try {
+      if (!flushExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+        System.err.println("Warning: Flush tasks did not finish in time.");
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
+  }
 }

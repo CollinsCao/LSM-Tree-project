@@ -1,4 +1,4 @@
-package com.collinscao.memtable;
+package com.collinscao.lsmtree.memtable;
 
 import com.collinscao.lsmtree.manifest.Manifest;
 import com.collinscao.lsmtree.memtable.MemtableService;
@@ -8,7 +8,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import util.Constants;
+import com.util.Constants;
 
 import java.io.IOException;
 import java.nio.file.Path;

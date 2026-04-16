@@ -1,28 +1,45 @@
 package com.collinscao.lsmtree.core;
 
-import com.collinscao.memtable.Memtable;
+import com.collinscao.lsmtree.manifest.Manifest;
+import com.collinscao.lsmtree.sstable.SSTableService;
+import com.collinscao.lsmtree.memtable.MemtableService;
 import com.util.Constants;
+import java.io.IOException;
 
-public class DB {
-  private Memtable memtable;
+public class DB implements AutoCloseable {
+    private final Manifest manifest;
+    private final MemtableService memtableService;
+    private final SSTableService sstableService;
 
-  public DB() {
-    memtable = new Memtable();
-  }
-  public void put(String key, String value) {
-    memtable.put(key, value);
-  }
+    public DB() throws IOException {
+      this(Constants.DEFAULT_DATA_DIR);
+    }
 
-  public String get(String key) {
-    String value = memtable.get(key);
-    return (value.equals(Constants.TOMBSTONE) ? null : value);
-  }
+    public DB(String dataDir) throws IOException {
+      manifest = new Manifest(dataDir);
+      sstableService = new SSTableService(manifest);
+      memtableService = new MemtableService(manifest, sstableService);
+    }
 
-  public void remove(String key) {
-    memtable.put(key, Constants.TOMBSTONE);
-  }
+    public void put(String key, String value) throws IOException {
+      memtableService.put(key, value);
+    }
 
-  public void close() {
-    // TODO: finish.
+    public String get(String key) {
+      String value = memtableService.get(key);
+      if (value == null) {
+        value = sstableService.get(key);
+      }
+      return (value == null || value.equals(Constants.TOMBSTONE)) ? null : value;
+    }
+
+    public void remove(String key) throws IOException {
+      memtableService.put(key, Constants.TOMBSTONE);
+    }
+
+    @Override
+    public void close() throws IOException {
+      memtableService.close();
+      sstableService.stop();
+    }
   }
-}

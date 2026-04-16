@@ -11,7 +11,14 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.junit.jupiter.api.DisplayName;
 
 /**
  * Unit tests for {@link Manifest} to ensure metadata persistence
@@ -52,7 +59,7 @@ class ManifestTest {
     SSTable sst = SSTable.createSSTableFromMemtable(mem, tempDir);
 
     // 2. Execution: Register the SSTable into Level 0.
-    manifest.addSSTable(0, sst);
+    manifest.applyFlush(0, sst);
 
     // 3. Verification: Ensure metadata reflects the addition accurately.
     List<SSTable> level0 = manifest.getSSTable(0);
@@ -81,13 +88,13 @@ class ManifestTest {
     Memtable mem1 = new Memtable();
     mem1.put("a", "1");
     SSTable sst1 = SSTable.createSSTableFromMemtable(mem1, tempDir);
-    manifest.addSSTable(0, sst1);
+    manifest.applyFlush(0, sst1);
 
     // Create SSTable 2 (Level 1)
     Memtable mem2 = new Memtable();
     mem2.put("b", "2");
     SSTable sst2 = SSTable.createSSTableFromMemtable(mem2, tempDir);
-    manifest.addSSTable(1, sst2);
+    manifest.applyFlush(1, sst2);
 
     // Simulate system shutdown by discarding the current Manifest instance.
     manifest = null;
@@ -108,5 +115,91 @@ class ManifestTest {
     List<SSTable> l1 = recoveredManifest.getSSTable(1);
     assertEquals(1, l1.size(), "Level 1 should recover 1 file.");
     assertEquals("2", l1.get(0).get("b"), "Data should be reachable via recovered SSTable metadata.");
+  }
+
+  @Test
+  @DisplayName("Verify metadata consistency under concurrent read/write operations")
+  void testConcurrentReadWrite() throws InterruptedException {
+    int writeThreads = 5;
+    int readThreads = 5;
+    int operationsPerThread = 100;
+
+    // Use a thread pool to simulate concurrent execution
+    ExecutorService executor = Executors.newFixedThreadPool(writeThreads + readThreads);
+    // Use CountDownLatches to coordinate a simultaneous start and wait for completion
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch endLatch = new CountDownLatch(writeThreads + readThreads);
+
+    AtomicInteger errorCount = new AtomicInteger(0);
+
+    // 1. Define Writer Threads: Continuously invoke applyFlush
+    for (int i = 0; i < writeThreads; i++) {
+      final int threadId = i;
+      executor.submit(() -> {
+        try {
+          startLatch.await(); // Wait for the synchronized start signal
+          for (int j = 0; j < operationsPerThread; j++) {
+            // Simulate creating an SSTable from a Memtable
+            Memtable m = new Memtable();
+            m.put("key-" + threadId + "-" + j, "val");
+            SSTable sst = SSTable.createSSTableFromMemtable(m, tempDir);
+
+            // Persist the SSTable metadata to L0 in the Manifest
+            manifest.applyFlush(0, sst);
+          }
+        } catch (Exception e) {
+          e.printStackTrace();
+          errorCount.incrementAndGet();
+        } finally {
+          endLatch.countDown();
+        }
+      });
+    }
+
+    // 2. Define Reader Threads: Continuously invoke getLevelSnapshot and iterate
+    for (int i = 0; i < readThreads; i++) {
+      executor.submit(() -> {
+        try {
+          startLatch.await();
+          for (int j = 0; j < operationsPerThread * 2; j++) {
+            // Retrieve a snapshot of all levels
+            Map<Integer, List<SSTable>> snapshot = manifest.getLevelSnapshot();
+
+            /*
+             * Core Validation: Iterate through the snapshot.
+             * If the Manifest implementation lacks defensive copying,
+             * a ConcurrentModificationException will be triggered here.
+             */
+            for (List<SSTable> tables : snapshot.values()) {
+              for (SSTable sst : tables) {
+                assertNotNull(sst.getFilePath());
+              }
+            }
+            // Brief pause to increase the probability of thread interleaving
+            Thread.sleep(1);
+          }
+        } catch (Exception e) {
+          e.printStackTrace();
+          errorCount.incrementAndGet();
+        } finally {
+          endLatch.countDown();
+        }
+      });
+    }
+
+    // Signal all threads to start processing
+    startLatch.countDown();
+
+    // Wait for all threads to complete, with a 30-second timeout safety net
+    boolean finished = endLatch.await(30, TimeUnit.SECONDS);
+
+    assertTrue(finished, "Test timed out; a deadlock might have occurred.");
+    assertEquals(0, errorCount.get(), "Exceptions occurred during concurrent execution.");
+
+    // Final verification: Ensure the total number of L0 files matches expected count
+    List<SSTable> l0 = manifest.getSSTable(0);
+    assertEquals(writeThreads * operationsPerThread, l0.size(), "Final L0 file count mismatch.");
+
+    executor.shutdown();
   }
 }

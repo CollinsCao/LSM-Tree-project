@@ -1,7 +1,8 @@
-package com.collinscao.memtable;
+package com.collinscao.lsmtree.memtable;
 
 import com.collinscao.lsmtree.manifest.Manifest;
 import com.collinscao.lsmtree.sstable.SSTableService;
+import com.collinscao.memtable.Memtable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

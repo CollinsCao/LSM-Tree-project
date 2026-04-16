@@ -78,6 +78,13 @@ public class Compactor{
           heap.offer(new MergeElement(indexOfSourceSSTable, list.get(indexOfSourceSSTable).next()));
         }
 
+        while (!heap.isEmpty() && heap.peek().entry.getKey().equals(curKey)) {
+          int duplicateTableIndex = heap.poll().indexOfSourceSSTable;
+          if (list.get(duplicateTableIndex).hasNext()) {
+            heap.offer(new MergeElement(duplicateTableIndex, list.get(duplicateTableIndex).next()));
+          }
+        }
+        
         if (nextEntry.getValue().equals(Constants.TOMBSTONE)) {
           continue;
         }

@@ -52,7 +52,7 @@ class ManifestTest {
     SSTable sst = SSTable.createSSTableFromMemtable(mem, tempDir);
 
     // 2. Execution: Register the SSTable into Level 0.
-    manifest.addSSTable(0, sst);
+    manifest.applyFlush(0, sst);
 
     // 3. Verification: Ensure metadata reflects the addition accurately.
     List<SSTable> level0 = manifest.getSSTable(0);
@@ -81,13 +81,13 @@ class ManifestTest {
     Memtable mem1 = new Memtable();
     mem1.put("a", "1");
     SSTable sst1 = SSTable.createSSTableFromMemtable(mem1, tempDir);
-    manifest.addSSTable(0, sst1);
+    manifest.applyFlush(0, sst1);
 
     // Create SSTable 2 (Level 1)
     Memtable mem2 = new Memtable();
     mem2.put("b", "2");
     SSTable sst2 = SSTable.createSSTableFromMemtable(mem2, tempDir);
-    manifest.addSSTable(1, sst2);
+    manifest.applyFlush(1, sst2);
 
     // Simulate system shutdown by discarding the current Manifest instance.
     manifest = null;

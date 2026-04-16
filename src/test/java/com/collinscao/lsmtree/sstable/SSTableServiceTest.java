@@ -36,7 +36,7 @@ class SSTableServiceTest {
     memOld.put("a", "old_val"); // Shadowed key
     memOld.put("c", "val_c");   // Unique key in older tier
     SSTable sstOld = SSTable.createSSTableFromMemtable(memOld, tempDir);
-    manifest.addSSTable(0, sstOld);
+    manifest.applyFlush(0, sstOld);
 
     // Newer SSTable (sstNew): Flushed later.
     // In Level 0, newer files are prepended to ensure higher priority during lookups.
@@ -44,7 +44,7 @@ class SSTableServiceTest {
     memNew.put("a", "new_val"); // Overwrites/shadows older value
     memNew.put("b", "val_b");   // Unique key in newer tier
     SSTable sstNew = SSTable.createSSTableFromMemtable(memNew, tempDir);
-    manifest.addSSTable(0, sstNew);
+    manifest.applyFlush(0, sstNew);
 
     // 3. Initialize Service with the populated manifest
     ssTableService = new SSTableService(manifest);

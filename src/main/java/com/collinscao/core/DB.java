@@ -4,7 +4,7 @@ import com.collinscao.lsmtree.manifest.Manifest;
 import com.collinscao.memtable.MemtableService;
 import com.collinscao.lsmtree.sstable.SSTableService;
 import java.io.IOException;
-import com.collinscao.util.Constants;
+import com.util.Constants;
 
 public class DB implements AutoCloseable {
     private final Manifest manifest;

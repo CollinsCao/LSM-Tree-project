@@ -1,10 +1,10 @@
 package com.collinscao.core;
 
-import com.collinscao.manifest.Manifest;
+import com.collinscao.lsmtree.manifest.Manifest;
 import com.collinscao.memtable.MemtableService;
-import com.collinscao.lsmtree.SSTableService;
+import com.collinscao.lsmtree.sstable.SSTableService;
 import java.io.IOException;
-import util.Constants;
+import  com.util.Constants;
 
 public class DB implements AutoCloseable {
     private final Manifest manifest;
@@ -40,6 +40,6 @@ public class DB implements AutoCloseable {
     @Override
     public void close() throws IOException {
         memtableService.close();
-        sstableService.stop();
+        sstableService.close();
     }
 }

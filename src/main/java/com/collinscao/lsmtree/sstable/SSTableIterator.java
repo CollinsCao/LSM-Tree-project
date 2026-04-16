@@ -9,7 +9,7 @@ import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import com.util.IOUtils;
 
-public class SSTableIterator implements Iterator<Entry>, AutoCloseable {
+public class SSTableIterator implements Iterator<Entry<String ,String>>, AutoCloseable {
   private final RandomAccessFile raf;
   private long fileSize;
 

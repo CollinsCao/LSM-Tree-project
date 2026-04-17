@@ -39,6 +39,7 @@ class DBConcurrencyTest {
     }
   }
 
+  /** Tests concurrent operations under high load with background compaction. */
   @Test
   @DisplayName("High concurrency read/write triggering background flush and compaction")
   void testConcurrentReadWriteWithCompaction() throws InterruptedException {

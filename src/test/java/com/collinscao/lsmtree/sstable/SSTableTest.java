@@ -7,6 +7,7 @@ import com.collinscao.lsmtree.memtable.Memtable;
 import com.util.Constants;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -48,6 +49,7 @@ class SSTableTest {
   }
 
   @Test
+  @DisplayName("Generate unique SSTable file paths")
   void testSSTablePathGeneration(@TempDir Path tempDir) {
     Path p1 = SSTable.generateSSTablePath(tempDir);
     Path p2 = SSTable.generateSSTablePath(tempDir);
@@ -58,29 +60,36 @@ class SSTableTest {
     assertEquals(tempDir, p1.getParent(), "The path should be in the temporary directory.");
   }
 
-
+  /** Tests retrieval of existing keys from SSTable. */
   @Test
+  @DisplayName("Retrieve existing keys from SSTable")
   void testGetExistingKeys() {
     assertEquals("red_fruit", sstable.get("apple"), "Should return the correct value for 'apple'");
     assertEquals("yellow_fruit", sstable.get("banana"), "Should return the correct value for 'banana'");
     assertEquals("purple_fruit", sstable.get("elderberry"), "Should return the correct value for 'elderberry'");
   }
 
+  /** Tests retrieval of non-existing keys returns null. */
   @Test
+  @DisplayName("Handle non-existing keys gracefully")
   void testGetNonExistingKeys() {
     assertNull(sstable.get("avocado"), "Should return null for non-existent key (lower bound)");
     assertNull(sstable.get("cat"), "Should return null for non-existent key (middle range)");
     assertNull(sstable.get("zebra"), "Should return null for non-existent key (upper bound)");
   }
 
+  /** Tests retrieval of large values spanning multiple blocks. */
   @Test
+  @DisplayName("Retrieve large values across blocks")
   void testGetLargeValue() {
     String actual = sstable.get("fig");
     assertNotNull(actual);
     assertEquals(LARGE_VAL, actual, "Should correctly retrieve large string values");
   }
 
+  /** Tests that SSTable file is created and not empty. */
   @Test
+  @DisplayName("Verify SSTable file creation")
   void testFileExists() {
     Path path = sstable.getFilePath();
     assertTrue(Files.exists(path), "SSTable file should be created on disk");
@@ -91,7 +100,9 @@ class SSTableTest {
     }
   }
 
+  /** Tests SSTable recovery from disk after restart. */
   @Test
+  @DisplayName("Recover SSTable from disk")
   void testInitRecovery() throws IOException {
     // Arrange: Verify existing SSTable file from setUp
     Path path = sstable.getFilePath();

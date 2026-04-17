@@ -47,11 +47,13 @@ class ManifestTest {
     manifest = null;
   }
 
+  /** Tests adding and retrieving SSTables in specific levels. */
   /**
    * Verifies that SSTables are correctly registered in the in-memory metadata
    * and can be retrieved by their respective levels.
    */
   @Test
+  @DisplayName("Add and retrieve SSTables by level")
   void testAddAndGetSSTable() throws IOException {
     // 1. Setup: Flush a Memtable to create a physical SSTable file on disk.
     Memtable mem = new Memtable();
@@ -75,12 +77,14 @@ class ManifestTest {
     assertTrue(level1.isEmpty(), "Level 1 should remain empty.");
   }
 
+  /** Tests persistence and recovery after simulated restart. */
   /**
    * Validates the Manifest's core recovery logic.
    * Ensures that state is successfully persisted to the MANIFEST file
    * and can be restored after a simulated system restart.
    */
   @Test
+  @DisplayName("Persist and recover Manifest state")
   void testPersistenceAndRecovery() throws IOException {
     // --- Phase 1: Persistence ---
 
@@ -117,6 +121,7 @@ class ManifestTest {
     assertEquals("2", l1.get(0).get("b"), "Data should be reachable via recovered SSTable metadata.");
   }
 
+  /** Tests concurrent read/write operations on Manifest metadata. */
   @Test
   @DisplayName("Verify metadata consistency under concurrent read/write operations")
   void testConcurrentReadWrite() throws InterruptedException {

@@ -54,6 +54,7 @@ public class CompactorTest {
     return map;
   }
 
+  /** Tests compaction of SSTables with no overlapping keys. */
   @Test
   @DisplayName("Compact two SSTables with no overlapping keys")
   void testCompactNoOverlap() throws IOException {
@@ -86,6 +87,7 @@ public class CompactorTest {
     assertTrue(Files.exists(compactedSSTable.getFilePath()));
   }
 
+  /** Tests compaction with overlapping keys where newer values win. */
   @Test
   @DisplayName("Compact two SSTables with overlapping keys, newer should win")
   void testCompactWithOverlapNewerWins() throws IOException {
@@ -119,6 +121,7 @@ public class CompactorTest {
     assertTrue(Files.exists(compactedSSTable.getFilePath()));
   }
 
+  /** Tests compaction of multiple SSTables with complex overlaps. */
   @Test
   @DisplayName("Compact multiple SSTables with complex overlaps")
   void testCompactMultipleSSTables() throws IOException {
@@ -162,6 +165,7 @@ public class CompactorTest {
     assertTrue(Files.exists(compactedSSTable.getFilePath()));
   }
 
+  /** Tests compaction of a single SSTable. */
   @Test
   @DisplayName("Compact with a single SSTable")
   void testCompactSingleSSTable() throws IOException {
@@ -179,6 +183,7 @@ public class CompactorTest {
     assertTrue(Files.exists(compactedSSTable.getFilePath()));
   }
 
+  /** Tests compaction of empty SSTables. */
   @Test
   @DisplayName("Compact with empty SSTables")
   void testCompactEmptySSTables() throws IOException {
@@ -194,6 +199,7 @@ public class CompactorTest {
     assertTrue(Files.exists(compactedSSTable.getFilePath()));
   }
 
+  /** Tests compaction with mixed empty and non-empty SSTables. */
   @Test
   @DisplayName("Compact with some empty and some non-empty SSTables")
   void testCompactMixedEmptyNonEmpty() throws IOException {
@@ -222,6 +228,7 @@ public class CompactorTest {
     assertTrue(Files.exists(compactedSSTable.getFilePath()));
   }
 
+  /** Tests compaction removing keys marked as tombstones. */
   @Test
   @DisplayName("Compaction should remove keys marked as DELETED (Tombstones)")
   void testCompactWithDeletions() throws IOException {

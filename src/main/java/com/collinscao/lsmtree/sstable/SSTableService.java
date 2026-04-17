@@ -12,6 +12,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Service for managing SSTable operations including flushing and compaction.
+ *
+ * This class coordinates the background processing of memtable flushes to SSTables
+ * and manages the compaction process across different levels. It uses separate
+ * thread pools for flush and compaction operations to ensure efficient resource usage.
+ */
 public class SSTableService {
   private static final int L0_THRESHOLD = 4;
   private static final int L1_THRESHOLD = 10;
@@ -28,11 +35,28 @@ public class SSTableService {
     return t;
   });
 
+  /**
+   * Creates a new SSTableService with the specified manifest.
+   *
+   * Initializes the service with separate thread pools for flush and compaction
+   * operations, and creates a compactor instance for merging SSTables.
+   *
+   * @param manifest the manifest for managing SSTable metadata
+   */
   public SSTableService(Manifest manifest) {
     this.manifest = manifest;
     this.compactor = new Compactor();
   }
 
+  /**
+   * Submits a background task to flush an immutable memtable to an SSTable.
+   *
+   * This method creates an SSTable from the memtable data, updates the manifest,
+   * deletes the associated WAL file, and triggers compaction if needed.
+   *
+   * @param holder the immutable memtable and WAL holder to flush
+   * @param onComplete callback to run after successful flush
+   */
   public void submitFlushTask(MemtableService.ImmutableHolder holder, Runnable onComplete) {
     flushExecutor.submit(() -> {
       try {
@@ -96,6 +120,16 @@ public class SSTableService {
     return false;
   }
 
+  /**
+   * Retrieves the value associated with the specified key from SSTables.
+   *
+   * Searches through all levels of SSTables in order, starting from level 0
+   * (most recent) to higher levels. For level 0, searches from newest to oldest
+   * SSTable. For other levels, searches in any order since they are sorted.
+   *
+   * @param key the key to look up
+   * @return the value associated with the key, or null if not found
+   */
   public String get(String key) {
     for (int i = 0; i < Constants.MAX_LEVEL; i++) {
       List<SSTable> levelList = manifest.getSSTable(i);
@@ -122,6 +156,13 @@ public class SSTableService {
     return val.equals(Constants.TOMBSTONE) ? null : val;
   }
 
+  /**
+   * Stops the SSTable service and shuts down background threads.
+   *
+   * Initiates shutdown of both flush and compaction executors and waits
+   * up to 30 seconds for flush tasks to complete. Compaction tasks may
+   * continue running in the background.
+   */
   public void stop() {
     flushExecutor.shutdown();
     compactExecutor.shutdown();

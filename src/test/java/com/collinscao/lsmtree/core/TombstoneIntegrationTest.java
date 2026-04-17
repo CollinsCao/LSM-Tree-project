@@ -33,6 +33,7 @@ class TombstoneIntegrationTest {
     }
   }
 
+  /** Tests tombstone masking across memtable and SSTables with restarts. */
   @Test
   @DisplayName("Verify that tombstones successfully mask older data across Memtable and SSTables")
   void testTombstoneMasking() throws IOException {

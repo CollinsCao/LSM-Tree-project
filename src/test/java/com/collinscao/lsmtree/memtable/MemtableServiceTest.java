@@ -6,6 +6,7 @@ import com.collinscao.lsmtree.sstable.SSTable;
 import com.collinscao.lsmtree.sstable.SSTableService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import com.util.Constants;
@@ -49,7 +50,9 @@ class MemtableServiceTest {
         }
     }
 
+    /** Tests basic put and get operations in memory without flush. */
     @Test
+    @DisplayName("Put and get data in active memtable")
     void testPutAndGetInMemory() throws IOException {
         // Validate basic volatile storage operations (Read-Your-Writes consistency)
         memtableService.put("key1", "value1");
@@ -62,7 +65,9 @@ class MemtableServiceTest {
                 "Data should not be flushed to disk before reaching the size threshold");
     }
 
+    /** Tests automatic flush when exceeding memtable size threshold. */
     @Test
+    @DisplayName("Automatic flush on size threshold")
     void testFlushOnThreshold() throws IOException, InterruptedException {
         // Objective: Trigger an automatic flush by exceeding the memtable size limit
         int threshold = Constants.MAXSIZE_MEMTABLE;
@@ -94,7 +99,9 @@ class MemtableServiceTest {
                 "The SSTable file must be stored within the designated temporary directory");
     }
 
+    /** Tests flush triggered on service close to prevent data loss. */
     @Test
+    @DisplayName("Flush on service close")
     void testCloseTriggersFlush() throws IOException {
         // 1. Perform a small write that does not trigger the threshold
         memtableService.put("k_close", "v_close");

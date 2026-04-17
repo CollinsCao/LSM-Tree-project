@@ -2,6 +2,7 @@ package com.collinscao.lsmtree.sstable;
 
 import com.collinscao.lsmtree.memtable.Memtable;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -37,7 +38,9 @@ class SSTableBloomFilterTest {
     sstable = SSTable.createSSTableFromMemtable(mem, tempDir);
   }
 
+  /** Tests Bloom Filter positive cases with existing keys. */
   @Test
+  @DisplayName("Bloom Filter allows existing keys")
   void testBloomFilterPositive() {
     // Verify that existing keys are accessible (no false negatives from Bloom Filter).
     assertEquals("value1", sstable.get(KEY_1));
@@ -45,7 +48,9 @@ class SSTableBloomFilterTest {
     assertEquals("value3", sstable.get(KEY_3));
   }
 
+  /** Tests Bloom Filter negative cases with absent keys within range. */
   @Test
+  @DisplayName("Bloom Filter blocks absent keys within range")
   void testBloomFilterNegative() {
     /**
      * Verify Bloom Filter filtering capability.
@@ -55,7 +60,9 @@ class SSTableBloomFilterTest {
     assertNull(sstable.get(ABSENT_KEY), "Bloom Filter should intercept and return null for absent key.");
   }
 
+  /** Tests Bloom Filter functionality after SSTable recovery. */
   @Test
+  @DisplayName("Bloom Filter works after recovery")
   void testBloomFilterAfterRecovery() throws IOException {
     // 1. Capture file path and clear current instance.
     Path path = sstable.getFilePath();
@@ -71,7 +78,9 @@ class SSTableBloomFilterTest {
     assertNull(recoveredSstable.get(ABSENT_KEY), "Reconstructed Bloom Filter should still intercept absent keys.");
   }
 
+  /** Tests range check for keys outside min/max bounds. */
   @Test
+  @DisplayName("Range check blocks keys outside bounds")
   void testRangeCheckStillWorks() {
     // Verify primary range guard (min/max check) which occurs before Bloom Filter evaluation.
     assertNull(sstable.get("aaaaa"), "Should return null for keys smaller than minKey.");

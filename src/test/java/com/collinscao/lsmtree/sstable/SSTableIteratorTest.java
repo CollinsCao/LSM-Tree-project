@@ -2,6 +2,7 @@ package com.collinscao.lsmtree.sstable;
 
 import com.collinscao.lsmtree.memtable.Memtable;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,7 +41,9 @@ class SSTableIteratorTest {
     sstable = SSTable.createSSTableFromMemtable(mem, tempDir);
   }
 
+  /** Tests iteration over all entries in sorted order. */
   @Test
+  @DisplayName("Iterate all entries in order")
   void testIterationAllEntries() throws IOException {
     // Verify that the iterator traverses all entries in the correct order
     try (SSTableIterator iterator = new SSTableIterator(sstable)) {
@@ -60,7 +63,9 @@ class SSTableIteratorTest {
     }
   }
 
+  /** Tests exception thrown when next() called on exhausted iterator. */
   @Test
+  @DisplayName("Exception on next() after exhaustion")
   void testNoSuchElementException() throws IOException {
     try (SSTableIterator iterator = new SSTableIterator(sstable)) {
       // Consume all elements
@@ -74,7 +79,9 @@ class SSTableIteratorTest {
     }
   }
 
+  /** Tests iteration over empty SSTable. */
   @Test
+  @DisplayName("Iterate empty SSTable")
   void testEmptySSTable() throws IOException {
     // Test iterator behavior with an empty SSTable
     Memtable emptyMem = new Memtable();
@@ -85,7 +92,9 @@ class SSTableIteratorTest {
     }
   }
 
+  /** Tests iteration with large values spanning multiple blocks. */
   @Test
+  @DisplayName("Iterate large values across blocks")
   void testLargeValueIteration() throws IOException {
     // Validate that large values (potentially exceeding block sizes) are handled correctly
     Memtable mem = new Memtable();

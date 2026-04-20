@@ -2,7 +2,27 @@ package com.collinscao.lsmtree.core;
 
 import java.util.Scanner;
 
+/**
+ * Command-line interface for the LSM Tree database.
+ *
+ * This class provides a simple interactive shell for performing basic database operations
+ * including storing, retrieving, and deleting key-value pairs. It supports the following commands:
+ * * put <key> <value> - Store a key-value pair
+ * * get <key> - Retrieve the value for a key
+ * * del <key> - Delete a key-value pair
+ * * exit - Exit the application
+ */
 public class Main {
+
+    /**
+     * Main entry point for the LSM Tree database command-line interface.
+     *
+     * Initializes the database, starts an interactive command loop, and processes user commands
+     * for database operations. The application supports put, get, delete, and exit operations
+     * through a simple text-based interface.
+     *
+     * @param args command-line arguments (currently unused)
+     */
     public static void main(String[] args) {
       System.out.println("Initializing DB...");
 

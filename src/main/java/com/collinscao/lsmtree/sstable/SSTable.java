@@ -19,6 +19,13 @@ import java.util.TreeMap;
 import com.util.IOUtils;
 
 
+/**
+ * Represents a Sorted String Table (SSTable) for persistent key-value storage.
+ *
+ * This class manages SSTable files that store sorted key-value pairs on disk.
+ * It includes a Bloom filter for efficient key existence checks, block-based
+ * indexing for fast lookups, and metadata about key ranges.
+ */
 public class SSTable {
   private final Path filePath;
   private BloomFilter<String> bloomFilter;
@@ -28,6 +35,18 @@ public class SSTable {
 
   private static final int MAX_BLOCK_SIZE = 4000;
 
+  /**
+   * Creates a new SSTable instance with the specified parameters.
+   *
+   * This constructor is used when creating an SSTable from existing data
+   * without needing to read from disk.
+   *
+   * @param filePath the path to the SSTable file
+   * @param bloomFilter the Bloom filter for key existence checks
+   * @param blocks the block index mapping first keys to block information
+   * @param maxKey the maximum key in this SSTable
+   * @param minKey the minimum key in this SSTable
+   */
   public SSTable(Path filePath, BloomFilter bloomFilter, TreeMap<String, BlockInfo> blocks, String maxKey, String minKey) {
     this.filePath = filePath;
     this.bloomFilter = bloomFilter;
@@ -36,6 +55,15 @@ public class SSTable {
     this.minKey = minKey;
   }
 
+  /**
+   * Creates a new SSTable instance by loading an existing file from disk.
+   *
+   * This constructor reads the SSTable file, initializes the Bloom filter,
+   * builds the block index, and determines the key range.
+   *
+   * @param filePath the path to the existing SSTable file
+   * @throws IOException if an I/O error occurs while reading the file
+   */
   public SSTable(Path filePath) throws IOException {
     this.filePath = filePath;
     this.blocks = new TreeMap<>();
@@ -85,6 +113,15 @@ public class SSTable {
   }
 
 
+  /**
+   * Generates a unique file path for a new SSTable.
+   *
+   * Creates a path using the SSTable prefix, current nanosecond timestamp,
+   * and file extension to ensure uniqueness.
+   *
+   * @param rootPath the root directory for SSTable files
+   * @return a unique path for the new SSTable file
+   */
   public static Path generateSSTablePath(Path rootPath) {
     String fileName = Constants.SSTABLE_PREFIX + System.nanoTime() + Constants.SSTABLE_FILE_EXTENSION;
     return rootPath.resolve(fileName);
@@ -94,10 +131,31 @@ public class SSTable {
 //    return createSSTableFromMemtable(memtable, Path.of("./data"));
 //  }
 
+  /**
+   * Creates an SSTable from a memtable.
+   *
+   * Flushes the contents of the memtable to a new SSTable file on disk.
+   *
+   * @param memtable the memtable to flush
+   * @param rootPath the root directory for the SSTable file
+   * @return the newly created SSTable
+   * @throws IOException if an I/O error occurs during creation
+   */
   public static SSTable createSSTableFromMemtable(Memtable memtable, Path rootPath) throws IOException {
     return createSSTableFromIterator(memtable.iterator(), generateSSTablePath(rootPath));
   }
 
+  /**
+   * Creates an SSTable from an iterator of key-value entries.
+   *
+   * Writes the entries from the iterator to a new SSTable file, building
+   * the Bloom filter and block index during the process.
+   *
+   * @param iterator the iterator providing key-value entries in sorted order
+   * @param filePath the path where the SSTable file will be created
+   * @return the newly created SSTable
+   * @throws IOException if an I/O error occurs during creation
+   */
   public static SSTable createSSTableFromIterator(Iterator<Entry<String, String>> iterator, Path filePath) throws IOException {
     Path folder = filePath.getParent();
     if (folder != null) {
@@ -158,9 +216,16 @@ public class SSTable {
   }
 
   /**
-   * Search in current memtable
-   * @param key The key db asks for.
-   * @return Null if not found or val coresponding to key.
+   * Retrieves the value associated with the specified key from this SSTable.
+   *
+   * Performs a multi-stage lookup process:
+   * 1. Checks if the key is within the SSTable's key range
+   * 2. Uses the Bloom filter for fast existence check
+   * 3. Locates the appropriate block using the block index
+   * 4. Performs binary search within the block data
+   *
+   * @param key the key to look up
+   * @return the value associated with the key, or null if not found
    */
   public String get(String key) {
     if (key.compareTo(maxKey) > 0 || key.compareTo(minKey) < 0) {
@@ -211,6 +276,11 @@ public class SSTable {
     return null;
   }
 
+  /**
+   * Returns the file path of this SSTable.
+   *
+   * @return the path to the SSTable file on disk
+   */
   public Path getFilePath() {
     return filePath;
   }

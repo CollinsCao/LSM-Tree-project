@@ -17,11 +17,27 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import com.util.Constants;
 
+/**
+ * Manages the metadata and state of SSTable files across different levels in the LSM Tree.
+ *
+ * This class handles the persistence and recovery of database state, maintaining a mapping
+ * of SSTable files organized by level. It provides thread-safe operations for adding and
+ * removing SSTables during flush and compaction operations.
+ */
 public class Manifest {
   private final Path rootPath;
   private final Map<Integer, List<SSTable>> levelMap;
   private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
 
+  /**
+   * Creates a new Manifest instance for the specified data directory.
+   *
+   * Initializes the manifest with the given data directory path and attempts to recover
+   * the database state from existing manifest files if they exist.
+   *
+   * @param dataDir the directory path where database files are stored
+   * @throws IOException if an I/O error occurs during initialization or recovery
+   */
   public Manifest(String dataDir) throws IOException {
     this.rootPath = Path.of(dataDir).toAbsolutePath();
     this.levelMap = new HashMap<>();
@@ -89,6 +105,14 @@ public class Manifest {
     Files.writeString(pathOfCurrentManifestFile, newManifestPath.getFileName().toString());
   }
 
+  /**
+   * Returns a snapshot of the current level mapping.
+   *
+   * Creates a thread-safe copy of the current SSTable organization across all levels.
+   * The returned map is a snapshot and will not reflect subsequent changes.
+   *
+   * @return a map where keys are level numbers and values are lists of SSTables at that level
+   */
   public Map<Integer, List<SSTable>> getLevelSnapshot() {
     rwLock.readLock().lock();
     try {
@@ -102,6 +126,16 @@ public class Manifest {
     }
   }
 
+  /**
+   * Applies a flush operation by adding an SSTable to the specified level.
+   *
+   * This method is called when memtable data is flushed to disk as an SSTable.
+   * It atomically updates the manifest state and persists the changes.
+   *
+   * @param level the level where the SSTable should be added
+   * @param sstable the SSTable to add to the manifest
+   * @throws IOException if an I/O error occurs during persistence
+   */
   public void applyFlush(int level, SSTable sstable) throws IOException {
     Map<Integer, List<String>> diskDataSnapshot;
     rwLock.writeLock().lock();
@@ -114,6 +148,19 @@ public class Manifest {
     persist(diskDataSnapshot);
   }
 
+  /**
+   * Applies a compaction operation by removing old SSTables and adding a new one.
+   *
+   * This method is called during compaction when multiple SSTables from a source level
+   * are merged into a single SSTable at a target level. It atomically updates the manifest
+   * state and persists the changes.
+   *
+   * @param sourceLevel the level from which SSTables are being removed
+   * @param oldTables the list of SSTables to remove from the source level
+   * @param targetLevel the level where the new SSTable should be added
+   * @param newTable the new SSTable to add to the target level
+   * @throws IOException if an I/O error occurs during persistence
+   */
   public void applyCompact(int sourceLevel, List<SSTable> oldTables,
       int targetLevel, SSTable newTable) throws IOException {
     Map<Integer, List<String>> diskDataSnapshot;
@@ -141,6 +188,15 @@ public class Manifest {
     levelTables.removeAll(sstables);
   }
 
+  /**
+   * Returns a list of SSTables at the specified level.
+   *
+   * Provides a thread-safe snapshot of all SSTables currently stored at the given level.
+   * Returns an empty list if the level contains no SSTables.
+   *
+   * @param level the level number to query
+   * @return a list of SSTables at the specified level, or an empty list if none exist
+   */
   public List<SSTable> getSSTable(int level) {
     rwLock.readLock().lock();
     try {
@@ -159,6 +215,11 @@ public class Manifest {
     return rootPath.resolve(fileName);
   }
 
+  /**
+   * Returns the root directory path for database files.
+   *
+   * @return the absolute path to the data directory
+   */
   public Path getRootPath() {
     return rootPath;
   }

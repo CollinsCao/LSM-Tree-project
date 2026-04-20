@@ -4,6 +4,7 @@ import com.collinscao.lsmtree.manifest.Manifest;
 import com.collinscao.lsmtree.memtable.Memtable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -60,14 +61,18 @@ class SSTableServiceTest {
     }
   }
 
+  /** Tests that newer SSTable values shadow older ones. */
   @Test
+  @DisplayName("Verify value shadowing in Level 0")
   void testGetOverwrite() {
     // Verify L0 shadowing: The most recent version (from sstNew) must take precedence
     String val = ssTableService.get("a");
     assertEquals("new_val", val, "Should retrieve the most recent value (shadowing check)");
   }
 
+  /** Tests fall-through lookup to older SSTables. */
   @Test
+  @DisplayName("Test fall-through to older SSTables")
   void testGetFallThrough() {
     // Verify fall-through: If a key is missing in newer SSTables,
     // the search should successfully continue into older files.
@@ -75,14 +80,18 @@ class SSTableServiceTest {
     assertEquals("val_c", val, "Should fall through to the older SSTable to find the value");
   }
 
+  /** Tests lookup for keys only in newest SSTable. */
   @Test
+  @DisplayName("Retrieve keys from newest SSTable")
   void testGetNewKey() {
     // Verify lookup for a key existing only in the most recent SSTable
     String val = ssTableService.get("b");
     assertEquals("val_b", val, "Should retrieve value from the most recent SSTable");
   }
 
+  /** Tests lookup for keys absent in all SSTables. */
   @Test
+  @DisplayName("Handle non-existent keys across all SSTables")
   void testGetNonExistent() {
     // Verify behavior when a key is absent across all SSTable tiers
     String val = ssTableService.get("z");
